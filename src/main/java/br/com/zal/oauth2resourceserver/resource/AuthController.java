@@ -3,13 +3,15 @@ package br.com.zal.oauth2resourceserver.resource;
 import br.com.zal.oauth2resourceserver.configs.JwtUtils;
 import br.com.zal.oauth2resourceserver.dao.UserDao;
 import br.com.zal.oauth2resourceserver.dto.AuthRequest;
+import br.com.zal.oauth2resourceserver.dto.AuthResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthController.class);
     private final AuthenticationManager authenticationManager;
     private final UserDao userDao;
     private final JwtUtils jwtUtils;
@@ -32,21 +35,23 @@ public class AuthController {
     }
 
     @PostMapping("/token")
-    public ResponseEntity<String> authenticate(@RequestBody AuthRequest request) {
-        SecurityContextHolder.getContext().getAuthentication();
+    public ResponseEntity<AuthResponse> authenticate(@RequestBody AuthRequest request) {
         try {
-            Authentication authenticate = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
-            SecurityContextHolder.getContext().setAuthentication(authenticate);
         } catch (BadCredentialsException e) {
-            System.out.println(e.getMessage());
+            LOGGER.warn("Fail to make a new login with active session. BadRequest");
         }
         final UserDetails user = userDao.findUserByEmail(request.getEmail());
         if (user != null) {
-            SecurityContextHolder.getContext().getAuthentication();
-            return ResponseEntity.ok(jwtUtils.generateToken(user));
+            final String token = jwtUtils.generateToken(user);
+            AuthResponse response = AuthResponse.builder()
+                    .token(token)
+                    .expiration(jwtUtils.extractExpiration(token))
+                    .build();
+            return ResponseEntity.ok(response);
         }
-        return ResponseEntity.badRequest().body("login failed");
+        return ResponseEntity.badRequest().build();
     }
 }
