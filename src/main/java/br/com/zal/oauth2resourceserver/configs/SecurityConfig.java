@@ -30,6 +30,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests()
                 .antMatchers("/**/auth/**")
                 .permitAll()
+                .antMatchers("/**/h2-console/**")
+                .permitAll()
                 .anyRequest()
                 .authenticated()
                 .and()
